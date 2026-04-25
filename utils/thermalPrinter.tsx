@@ -1,6 +1,6 @@
-const HOTEL_NAME = "BRUNDAVANA DOSE MANE"
+const HOTEL_NAME = "BRUNDAVANA RECIPES"
 const LOCATION = "Near bejai church hall, mangalore"
-const TEL = "+91 6361764264"
+const TEL = "+91 8660638242"
 const LINE_WIDTH = 32 // Adjusted for 3-inch thermal paper
 
 // Unified token number counter that starts from 0001 and resets after 9999
