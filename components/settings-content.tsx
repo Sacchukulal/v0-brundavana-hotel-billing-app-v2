@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Pencil } from "lucide-react"
 
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => any {
   let timeout: NodeJS.Timeout | null = null
@@ -53,6 +53,9 @@ export default function SettingsContent() {
   const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState(false)
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
   const [showAddCategoryDialog, setShowAddCategoryDialog] = useState(false)
+  const [showEditItemDialog, setShowEditItemDialog] = useState(false)
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+  const [editItemForm, setEditItemForm] = useState({ name: "", price: "" })
 
   // Fix for items not loading on first visit
   useEffect(() => {
@@ -264,6 +267,54 @@ export default function SettingsContent() {
       toast({
         title: "Error",
         description: "Failed to add category. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openEditDialog = (item: MenuItem) => {
+    setEditingItem(item)
+    setEditItemForm({ name: item.name, price: item.price.toString() })
+    setShowEditItemDialog(true)
+  }
+
+  const handleEditItemSubmit = async () => {
+    if (!editingItem) return
+
+    if (!editItemForm.name.trim() || !editItemForm.price.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const updatedItem = {
+        ...editingItem,
+        name: editItemForm.name,
+        price: Number(editItemForm.price),
+      }
+
+      await saveMenuItem(updatedItem)
+
+      setMenuItems((prev) =>
+        prev.map((item) => (item.id === editingItem.id ? updatedItem : item))
+      )
+
+      setShowEditItemDialog(false)
+      setEditingItem(null)
+
+      toast({
+        title: "Success",
+        description: "Menu item updated successfully.",
+      })
+    } catch (error) {
+      console.error("Error updating menu item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update menu item. Please try again.",
         variant: "destructive",
       })
     }
@@ -489,39 +540,49 @@ export default function SettingsContent() {
                       <TableRow key={item.id}>
                         <TableCell>{item.name}</TableCell>
                         <TableCell className="text-green-600 dark:text-green-400">₹{item.price.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                await deleteMenuItem(item.id)
-                                setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                                toast({
-                                  title: "Success",
-                                  description: "Item deleted successfully",
-                                })
-                              } catch (error) {
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to delete item",
-                                  variant: "destructive",
-                                })
-                              }
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )
-          })}
+<TableCell>
+                                          <div className="flex gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => openEditDialog(item)}
+                                            >
+                                              <Pencil className="h-4 w-4 mr-1" />
+                                              Edit
+                                            </Button>
+                                            <Button
+                                              variant="destructive"
+                                              size="sm"
+                                              onClick={async () => {
+                                                try {
+                                                  await deleteMenuItem(item.id)
+                                                  setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
+                                                  toast({
+                                                    title: "Success",
+                                                    description: "Item deleted successfully",
+                                                  })
+                                                } catch (error) {
+                                                  toast({
+                                                    title: "Error",
+                                                    description: "Failed to delete item",
+                                                    variant: "destructive",
+                                                  })
+                                                }
+                                              }}
+                                            >
+                                              Delete
+                                            </Button>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            )
+                          })}
 
-          {/* Show items that don't have a matching category */}
+                          {/* Show items that don't have a matching category */}
           {menuItems.filter((item) => !categories.some((cat) => cat.id === item.section || cat.name === item.section))
             .length > 0 && (
             <div className="mb-6">
@@ -542,28 +603,38 @@ export default function SettingsContent() {
                         <TableCell>{item.name}</TableCell>
                         <TableCell className="text-green-600 dark:text-green-400">₹{item.price.toFixed(2)}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={async () => {
-                              try {
-                                await deleteMenuItem(item.id)
-                                setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                                toast({
-                                  title: "Success",
-                                  description: "Item deleted successfully",
-                                })
-                              } catch (error) {
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to delete item",
-                                  variant: "destructive",
-                                })
-                              }
-                            }}
-                          >
-                            Delete
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditDialog(item)}
+                            >
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  await deleteMenuItem(item.id)
+                                  setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
+                                  toast({
+                                    title: "Success",
+                                    description: "Item deleted successfully",
+                                  })
+                                } catch (error) {
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to delete item",
+                                    variant: "destructive",
+                                  })
+                                }
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -573,6 +644,42 @@ export default function SettingsContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Menu Item Dialog */}
+      <Dialog open={showEditItemDialog} onOpenChange={setShowEditItemDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Menu Item</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editItemName">Item Name</Label>
+              <Input
+                id="editItemName"
+                value={editItemForm.name}
+                onChange={(e) => setEditItemForm({ ...editItemForm, name: e.target.value })}
+                placeholder="Enter item name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editItemPrice">Price (₹)</Label>
+              <Input
+                id="editItemPrice"
+                type="number"
+                value={editItemForm.price}
+                onChange={(e) => setEditItemForm({ ...editItemForm, price: e.target.value })}
+                placeholder="Enter price"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditItemDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditItemSubmit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Category Confirmation Dialog */}
       <AlertDialog open={showDeleteCategoryDialog} onOpenChange={setShowDeleteCategoryDialog}>
