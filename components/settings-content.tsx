@@ -57,28 +57,70 @@ export default function SettingsContent() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [editItemForm, setEditItemForm] = useState({ name: "", price: "" })
 
-  // Fix for items not loading on first visit
+  // Fix for items not loading on first visit - use persistent auth state listener
   useEffect(() => {
-    const checkAuthAndLoadData = async () => {
-      // Wait for auth state to be determined
-      if (auth.currentUser) {
-        await loadData()
-      } else {
-        // Set up a listener for auth state changes
-        const unsubscribe = auth.onAuthStateChanged(async (user) => {
-          if (user) {
-            await loadData()
-          } else {
-            setError("Please log in to access menu items.")
-            setLoading(false)
-          }
-          unsubscribe()
-        })
-      }
-    }
+    let isMounted = true
+    
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!isMounted) return
+      
+      if (user) {
+        try {
+          setLoading(true)
+          setError(null)
 
-    checkAuthAndLoadData()
-  }, []) // Empty dependency array to run only once on mount
+          // Load both menu items and categories in parallel
+          const [items, cats] = await Promise.all([getMenuItems(), getCategories()])
+
+          if (!isMounted) return
+
+          setMenuItems(items)
+          setCategories(cats)
+
+          // If no categories exist yet, create default ones
+          if (cats.length === 0) {
+            const defaultCategories = ["Dose", "Juice", "Tea & Coffee", "Others"]
+            const categoryPromises = defaultCategories.map((cat) => saveCategory(cat))
+            const newCategoryIds = await Promise.all(categoryPromises)
+
+            if (!isMounted) return
+
+            const newCategories = defaultCategories.map((name, index) => ({
+              id: newCategoryIds[index],
+              name,
+              userId: user.uid,
+            }))
+
+            setCategories(newCategories)
+          }
+
+          setLoading(false)
+        } catch (error) {
+          console.error("Error loading data:", error)
+          if (isMounted) {
+            setError("Failed to load data. Please try again.")
+            setLoading(false)
+            toast({
+              title: "Error",
+              description: "Failed to load data. Please ensure you are logged in.",
+              variant: "destructive",
+            })
+          }
+        }
+      } else {
+        if (isMounted) {
+          setError("Please log in to access menu items.")
+          setLoading(false)
+        }
+      }
+    })
+
+    // Cleanup function - unsubscribe from listener when component unmounts
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [toast]) // Include toast in dependencies
 
   const loadData = async () => {
     try {
