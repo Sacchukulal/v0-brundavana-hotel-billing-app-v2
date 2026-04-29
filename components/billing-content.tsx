@@ -266,6 +266,11 @@ export default function BillingContent() {
         throw new Error("User not authenticated")
       }
 
+      // Save menu items details for reprinting
+      const orderMenuItems = menuItems
+        .filter(item => Object.keys(combinedOrder).includes(item.id))
+        .map(item => ({ id: item.id, name: item.name, price: item.price }))
+
       await saveOrder({
         items: combinedOrder,
         total,
@@ -276,6 +281,7 @@ export default function BillingContent() {
         timestamp: new Date(),
         userId: auth.currentUser.uid,
         parcelItems: Array.from(parcelItems), // Save parcel items information
+        menuItems: orderMenuItems, // Save menu item details for reprinting
       })
 
       // Refocus the search input after printing
@@ -314,6 +320,11 @@ export default function BillingContent() {
         throw new Error("User not authenticated")
       }
 
+      // Save menu items details for reprinting
+      const orderMenuItems = menuItems
+        .filter(item => Object.keys(order).includes(item.id))
+        .map(item => ({ id: item.id, name: item.name, price: item.price }))
+
       await saveOrder({
         items: order,
         total,
@@ -322,6 +333,7 @@ export default function BillingContent() {
         tokenNumber: currentToken,
         timestamp: new Date(),
         userId: auth.currentUser.uid,
+        menuItems: orderMenuItems, // Save menu item details for reprinting
       })
 
       toast({
@@ -827,22 +839,27 @@ export default function BillingContent() {
     try {
       const total = customItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-      // Create bill content
-      const content = generateBillContent(
-        customItems.reduce(
-          (acc, item, index) => ({
-            ...acc,
-            [`custom-${index}`]: item.quantity,
-          }),
-          {},
-        ),
+      // Create items map and menu items for custom bill
+      const customItemsMap = customItems.reduce(
+        (acc, item, index) => ({
+          ...acc,
+          [`custom-${index}`]: item.quantity,
+        }),
+        {},
+      )
+      
+      const customMenuItems = customItems.map((item, index) => ({
+        id: `custom-${index}`,
+        name: item.name,
+        price: item.price,
+      }))
+
+      // Create bill content with token number
+      const { content, tokenNumber: billToken } = generateBillContent(
+        customItemsMap,
         total,
-        customItems.map((item, index) => ({
-          id: `custom-${index}`,
-          name: item.name,
-          price: item.price,
-        })),
-      ).content
+        customMenuItems,
+      )
 
       // Print the bill
       printThermal(content, "Bill")
@@ -853,20 +870,16 @@ export default function BillingContent() {
       }
 
       await saveOrder({
-        items: customItems.reduce(
-          (acc, item, index) => ({
-            ...acc,
-            [`custom-${index}`]: item.quantity,
-          }),
-          {},
-        ),
+        items: customItemsMap,
         total,
         kotPrinted: true,
         billPrinted: true,
         isCustomBill: true,
         customItems,
+        tokenNumber: billToken,
         timestamp: new Date(),
         userId: auth.currentUser.uid,
+        menuItems: customMenuItems, // Save for reprinting
       })
 
       toast({

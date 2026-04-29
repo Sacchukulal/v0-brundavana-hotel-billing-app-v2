@@ -10,18 +10,22 @@ export interface MenuItem {
 }
 
 export interface Order {
+  id?: string
   items: {
     [key: string]: number
   }
   subtotal: number
   discount: number
   total: number
-  timestamp: Date
+  timestamp: any
   kotPrinted: boolean
   billPrinted: boolean
   userId: string
   isCustomBill?: boolean
   customItems?: Array<{ name: string; price: number; quantity: number }>
+  tokenNumber?: string
+  parcelItems?: string[]
+  menuItems?: Array<{ id: string; name: string; price: number }>
 }
 
 export interface Expense {

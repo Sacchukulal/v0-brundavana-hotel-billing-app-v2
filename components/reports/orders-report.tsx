@@ -70,7 +70,35 @@ export function OrdersReport() {
 
   const handleReprintBill = (order: Order) => {
     try {
-      const { content } = generateBillContent(order.items, order.total, order.menuItems || [], order.tokenNumber)
+      // Build menu items array for reprinting
+      let reprintMenuItems: Array<{ id: string; name: string; price: number }> = []
+
+      // Use saved menuItems if available
+      if (order.menuItems && order.menuItems.length > 0) {
+        reprintMenuItems = order.menuItems
+      }
+
+      // Add custom items to the menu items array for reprinting
+      if (order.customItems && order.customItems.length > 0) {
+        order.customItems.forEach((customItem, index) => {
+          reprintMenuItems.push({
+            id: `custom-${index}`,
+            name: customItem.name,
+            price: customItem.price,
+          })
+        })
+      }
+
+      // Get parcel items if available
+      const parcelItems = order.parcelItems ? new Set(order.parcelItems) : undefined
+
+      const { content } = generateBillContent(
+        order.items, 
+        order.total, 
+        reprintMenuItems, 
+        order.tokenNumber,
+        parcelItems
+      )
       printThermal(content, "Bill")
       toast({
         title: "Success",
