@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc, setDoc, getDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc } from "firebase/firestore"
 import { db, auth } from "./firebase"
 
 export interface MenuItem {
@@ -26,15 +26,6 @@ export interface Order {
   tokenNumber?: string
   parcelItems?: string[]
   menuItems?: Array<{ id: string; name: string; price: number }>
-}
-
-export interface TempTableOrder {
-  items: { [key: string]: number }
-  customItems: Array<{ name: string; price: number; quantity: number }>
-  parcelItems: string[]
-  tableName: string
-  savedAt: any
-  userId: string
 }
 
 export interface Expense {
@@ -1077,59 +1068,6 @@ export const deleteCategory = async (categoryId: string) => {
   }
 }
 
-// Temporary Table Order Functions
-const saveTempTableOrder = async (
-  tableOrder: Omit<TempTableOrder, "savedAt" | "userId">
-) => {
-  try {
-    const user = auth.currentUser
-    if (!user) throw new Error("No authenticated user")
-
-    const docRef = doc(db, "tempTableOrders", user.uid)
-    await setDoc(docRef, {
-      ...tableOrder,
-      savedAt: Timestamp.now(),
-      userId: user.uid,
-    })
-    return true
-  } catch (error) {
-    console.error("Error saving temp table order:", error)
-    throw error
-  }
-}
-
-const getTempTableOrder = async (): Promise<TempTableOrder | null> => {
-  try {
-    const user = auth.currentUser
-    if (!user) throw new Error("No authenticated user")
-
-    const docRef = doc(db, "tempTableOrders", user.uid)
-    const docSnap = await getDoc(docRef)
-
-    if (docSnap.exists()) {
-      return docSnap.data() as TempTableOrder
-    }
-    return null
-  } catch (error) {
-    console.error("Error getting temp table order:", error)
-    throw error
-  }
-}
-
-const deleteTempTableOrder = async () => {
-  try {
-    const user = auth.currentUser
-    if (!user) throw new Error("No authenticated user")
-
-    const docRef = doc(db, "tempTableOrders", user.uid)
-    await deleteDoc(docRef)
-    return true
-  } catch (error) {
-    console.error("Error deleting temp table order:", error)
-    throw error
-  }
-}
-
 export {
   saveOrder,
   getOrders,
@@ -1147,7 +1085,4 @@ export {
   getDashboardStats,
   saveMonthlyBillPayment,
   getMonthlyBillPayments,
-  saveTempTableOrder,
-  getTempTableOrder,
-  deleteTempTableOrder,
 }
