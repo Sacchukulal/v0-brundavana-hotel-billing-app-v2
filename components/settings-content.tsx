@@ -69,8 +69,8 @@ export default function SettingsContent() {
           setLoading(true)
           setError(null)
 
-          // Load both menu items and categories in parallel
-          const [items, cats] = await Promise.all([getMenuItems(), getCategories()])
+          // Load both menu items and categories in parallel - pass userId explicitly
+          const [items, cats] = await Promise.all([getMenuItems(user.uid), getCategories(user.uid)])
 
           if (!isMounted) return
 
@@ -122,13 +122,14 @@ export default function SettingsContent() {
     }
   }, [toast]) // Include toast in dependencies
 
-  const loadData = async () => {
+  const loadData = async (userId?: string) => {
     try {
       setLoading(true)
       setError(null)
 
+      const uid = userId || auth.currentUser?.uid
       // Load both menu items and categories in parallel
-      const [items, cats] = await Promise.all([getMenuItems(), getCategories()])
+      const [items, cats] = await Promise.all([getMenuItems(uid), getCategories(uid)])
 
       setMenuItems(items)
       setCategories(cats)
@@ -383,7 +384,7 @@ export default function SettingsContent() {
         }
 
         // Reload items to reflect changes
-        const updatedItems = await getMenuItems()
+        const updatedItems = await getMenuItems(auth.currentUser?.uid)
         setMenuItems(updatedItems)
       }
 

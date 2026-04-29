@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/components/ui/use-toast"
 import { getOrders, getMenuItems, getCategories, type Order, type MenuItem, type Category } from "@/utils/dataService"
+import { auth } from "@/utils/firebase"
 import { format } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -42,16 +43,28 @@ export function ItemSalesReport() {
   const { toast } = useToast()
 
   useEffect(() => {
-    loadData()
+    let isMounted = true
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!isMounted) return
+      if (user) {
+        await loadData(user.uid)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
   }, [])
 
-  const loadData = async () => {
+  const loadData = async (userId?: string) => {
     try {
       setLoading(true)
       const [fetchedOrders, fetchedMenuItems, fetchedCategories] = await Promise.all([
         getOrders(),
-        getMenuItems(),
-        getCategories(),
+        getMenuItems(userId),
+        getCategories(userId),
       ])
 
       // Filter to only include orders with billPrinted=true

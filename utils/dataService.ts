@@ -111,23 +111,23 @@ const saveMenuItem = async (item: Omit<MenuItem, "id" | "userId">) => {
   }
 }
 
-const getMenuItems = async () => {
+const getMenuItems = async (userId?: string) => {
   try {
-    const user = auth.currentUser
-    if (!user) throw new Error("No authenticated user")
-
-    const q = query(collection(db, "menuItems"), where("userId", "==", user.uid))
-    const querySnapshot = await getDocs(q)
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as MenuItem[]
+  const uid = userId || auth.currentUser?.uid
+  if (!uid) throw new Error("No authenticated user")
+  
+  const q = query(collection(db, "menuItems"), where("userId", "==", uid))
+  const querySnapshot = await getDocs(q)
+  
+  return querySnapshot.docs.map((doc) => ({
+  id: doc.id,
+  ...doc.data(),
+  })) as MenuItem[]
   } catch (error) {
-    console.error("Error getting menu items:", error)
-    throw new Error("Failed to load menu items. Please ensure you are logged in.")
+  console.error("Error getting menu items:", error)
+  throw new Error("Failed to load menu items. Please ensure you are logged in.")
   }
-}
+  }
 
 const saveExpense = async (expense: Omit<Expense, "id" | "userId" | "timestamp">) => {
   try {
@@ -702,7 +702,7 @@ const getDashboardStats = async (): Promise<DashboardStats> => {
       getOrders(),
       getExpenses(),
       getMonthlyBillCustomers(),
-      getMenuItems(),
+      getMenuItems(user.uid),
     ])
 
     // Process orders
@@ -1034,13 +1034,13 @@ export const saveCategory = async (categoryName: string) => {
   }
 }
 
-export const getCategories = async () => {
+export const getCategories = async (userId?: string) => {
   try {
-    const user = auth.currentUser
-    if (!user) throw new Error("No authenticated user")
-
-    const q = query(collection(db, "categories"), where("userId", "==", user.uid))
-    const querySnapshot = await getDocs(q)
+  const uid = userId || auth.currentUser?.uid
+  if (!uid) throw new Error("No authenticated user")
+  
+  const q = query(collection(db, "categories"), where("userId", "==", uid))
+  const querySnapshot = await getDocs(q)
 
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,

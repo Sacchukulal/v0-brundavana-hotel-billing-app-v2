@@ -534,9 +534,9 @@ export default function BillingContent() {
     }
   }, [newCustomerName, newCustomerPhone, monthlyBillCustomers, toast])
 
-  const loadMenuItems = useCallback(async () => {
+  const loadMenuItems = useCallback(async (userId?: string) => {
     try {
-      const items = await getMenuItems()
+      const items = await getMenuItems(userId)
       setMenuItems(items)
       setLoading(false)
     } catch (error) {
@@ -551,28 +551,40 @@ export default function BillingContent() {
   }, [toast])
 
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        await loadMenuItems()
-        const [customers, favoriteItemIds, loadedCategories] = await Promise.all([
-          getMonthlyBillCustomers({ withoutSorting: true }),
-          getFavoriteItems(),
-          getCategories(),
-        ])
-        setMonthlyBillCustomers(customers)
-        setFavoriteItems(new Set(favoriteItemIds))
-        setCategories(loadedCategories)
-      } catch (error: any) {
-        console.error("Error loading initial data:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load initial data. Please refresh the page or contact support.",
-          variant: "destructive",
-        })
-      }
-    }
+    let isMounted = true
 
-    loadInitialData()
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!isMounted) return
+
+      if (user) {
+        try {
+          await loadMenuItems(user.uid)
+          const [customers, favoriteItemIds, loadedCategories] = await Promise.all([
+            getMonthlyBillCustomers({ withoutSorting: true }),
+            getFavoriteItems(),
+            getCategories(user.uid),
+          ])
+          if (!isMounted) return
+          setMonthlyBillCustomers(customers)
+          setFavoriteItems(new Set(favoriteItemIds))
+          setCategories(loadedCategories)
+        } catch (error: any) {
+          console.error("Error loading initial data:", error)
+          if (isMounted) {
+            toast({
+              title: "Error",
+              description: "Failed to load initial data. Please refresh the page or contact support.",
+              variant: "destructive",
+            })
+          }
+        }
+      }
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
   }, [toast, loadMenuItems])
 
   const toggleFavorite = useCallback(
