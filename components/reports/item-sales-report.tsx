@@ -9,7 +9,8 @@ import { getOrders, getMenuItems, getCategories, type Order, type MenuItem, type
 import { format } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, ChevronLeft, ChevronRight, Download } from "lucide-react"
+import { CalendarIcon, ChevronLeft, ChevronRight, Download, Printer } from "lucide-react"
+import { generateCategorySalesReport, printThermal } from "@/utils/thermalPrinter"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -244,6 +245,42 @@ export function ItemSalesReport() {
   const totalQuantity = filteredSales.reduce((sum, sale) => sum + sale.quantity, 0)
   const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.revenue, 0)
 
+  const printCategorySalesReport = () => {
+    if (filteredSales.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No sales data to print for the selected filters",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Prepare sales data for printing
+    const salesData = filteredSales.map((sale) => ({
+      itemName: sale.itemName,
+      quantity: sale.quantity,
+      revenue: sale.revenue,
+    }))
+
+    const dateRange = {
+      startDate: startDate ? format(startDate, "dd MMM yyyy") : "All time",
+      endDate: endDate ? format(endDate, "dd MMM yyyy") : "All time",
+    }
+
+    const { content } = generateCategorySalesReport(
+      selectedCategory,
+      salesData,
+      dateRange
+    )
+
+    printThermal(content, "Bill")
+
+    toast({
+      title: "Success",
+      description: "Category sales report sent to printer",
+    })
+  }
+
   if (loading) {
     return <div>Loading item sales data...</div>
   }
@@ -256,10 +293,16 @@ export function ItemSalesReport() {
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <span>Item Sales Report</span>
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={printCategorySalesReport}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Report
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>

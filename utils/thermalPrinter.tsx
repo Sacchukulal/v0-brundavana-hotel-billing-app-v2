@@ -338,6 +338,99 @@ export const generateBillContent = (
   return { content, tokenNumber: currentTokenNumber }
 }
 
+export const generateCategorySalesReport = (
+  categoryName: string,
+  salesData: Array<{
+    itemName: string
+    quantity: number
+    revenue: number
+  }>,
+  dateRange: {
+    startDate: string
+    endDate: string
+  },
+) => {
+  // Aggregate sales by item name
+  const aggregatedSales = salesData.reduce(
+    (acc, sale) => {
+      if (!acc[sale.itemName]) {
+        acc[sale.itemName] = { quantity: 0, revenue: 0 }
+      }
+      acc[sale.itemName].quantity += sale.quantity
+      acc[sale.itemName].revenue += sale.revenue
+      return acc
+    },
+    {} as { [key: string]: { quantity: number; revenue: number } },
+  )
+
+  // Convert to array and sort by revenue (highest first)
+  const sortedSales = Object.entries(aggregatedSales)
+    .map(([itemName, data]) => ({
+      itemName,
+      quantity: data.quantity,
+      revenue: data.revenue,
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+
+  // Calculate totals
+  const totalQuantity = sortedSales.reduce((sum, item) => sum + item.quantity, 0)
+  const totalRevenue = sortedSales.reduce((sum, item) => sum + item.revenue, 0)
+
+  let content = `
+<div class="header">
+  <h1 class="brand">${HOTEL_NAME}</h1>
+  <p class="contact">${LOCATION}</p>
+  <p class="contact">${TEL}</p>
+</div>
+
+<div class="bill-info">
+  <div class="bill-header">
+    <div style="font-size: 14px; font-weight: 700;">Category Sales Report</div>
+  </div>
+  <div style="font-size: 12px; font-weight: 700; margin: 4px 0;">${categoryName === "all" ? "All Categories" : categoryName}</div>
+  <div style="font-size: 10px;">${dateRange.startDate} to ${dateRange.endDate}</div>
+  <div class="date-time">Printed: ${formatDateTime()}</div>
+</div>
+
+<div class="divider"></div>
+
+<table class="items-table">
+  <thead>
+    <tr>
+      <th style="width: 50%;">Item</th>
+      <th style="text-align: center;">Qty</th>
+      <th style="text-align: right;">Amount</th>
+    </tr>
+  </thead>
+  <tbody>`
+
+  sortedSales.forEach((item) => {
+    content += `
+    <tr>
+      <td style="font-size: 11px;">${item.itemName}</td>
+      <td style="text-align: center; font-weight: 700;">${item.quantity}</td>
+      <td style="text-align: right;">₹${item.revenue.toFixed(2)}</td>
+    </tr>`
+  })
+
+  content += `
+  </tbody>
+</table>
+
+<div class="divider"></div>
+
+<div class="total-section" style="display: flex; justify-content: space-between; font-size: 14px;">
+  <span>Total Qty: ${totalQuantity}</span>
+  <span>Total: ₹${totalRevenue.toFixed(2)}</span>
+</div>
+
+<div class="footer">
+  <p>--- End of Report ---</p>
+</div>`
+
+  return { content, totalQuantity, totalRevenue }
+}
+
 export const generateMonthlyBillContent = (
   customerName: string,
   billItems: Array<{
