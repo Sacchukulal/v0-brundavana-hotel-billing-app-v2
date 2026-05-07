@@ -20,7 +20,14 @@ import {
   getFavoriteItems,
   getCategories,
   type Category,
+  saveTableOrder,
+  getTableOrders,
+  deleteTableOrder,
+  checkInternetConnection,
+  type TableOrder,
 } from "@/utils/dataService"
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogAction } from "@/components/ui/alert-dialog"
+import { WifiOff } from "lucide-react"
 import { Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,14 +40,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 type BillingMode = "regular" | "monthly" | "custom"
 type MenuSection = (typeof menuSections)[number] | "Favorites"
 
-// Define a type for queued orders (tables)
-type QueuedOrder = {
-  id: string
-  tableName: string
-  order: { [key: string]: number }
-  customItems: Array<{ name: string; price: number; quantity: number }>
-  timestamp: Date
-}
+// Use TableOrder type from dataService for queued orders
+type QueuedOrder = TableOrder
 
 export default function BillingContent() {
   const [order, setOrder] = useState<{ [key: string]: number }>({})
@@ -76,6 +77,8 @@ export default function BillingContent() {
 
   const [parcelItems, setParcelItems] = useState<Set<string>>(new Set())
   const [printedCategories, setPrintedCategories] = useState<Set<string>>(new Set())
+  const [isOnline, setIsOnline] = useState(true)
+  const [showOfflineDialog, setShowOfflineDialog] = useState(false)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -233,6 +236,10 @@ export default function BillingContent() {
 
   // Update the handlePrintBill function to include parcel information
   const handlePrintBill = useCallback(async () => {
+    // Check internet connectivity before saving
+    const online = await ensureOnline()
+    if (!online) return
+
     try {
       const total = calculateTotal()
 
@@ -296,9 +303,14 @@ export default function BillingContent() {
         description: `Token #${currentToken} | Total: ₹${total}`,
       })
 
-      // If this was a queued order, remove it from the queue
-      if (selectedQueuedOrder) {
-        setQueuedOrders((prev) => prev.filter((item) => item.id !== selectedQueuedOrder.id))
+      // If this was a queued order, remove it from the queue and Firebase
+      if (selectedQueuedOrder && selectedQueuedOrder.id) {
+        try {
+          await deleteTableOrder(selectedQueuedOrder.id)
+          setQueuedOrders((prev) => prev.filter((item) => item.id !== selectedQueuedOrder.id))
+        } catch (error) {
+          console.error("Error deleting table order:", error)
+        }
       }
 
       resetOrder()
@@ -310,9 +322,13 @@ export default function BillingContent() {
         variant: "destructive",
       })
     }
-  }, [order, menuItems, customItems, currentToken, calculateTotal, resetOrder, toast, selectedQueuedOrder, parcelItems])
+  }, [order, menuItems, customItems, currentToken, calculateTotal, resetOrder, toast, selectedQueuedOrder, parcelItems, ensureOnline])
 
   const handleSaveBill = useCallback(async () => {
+    // Check internet connectivity before saving
+    const online = await ensureOnline()
+    if (!online) return
+
     try {
       const total = calculateTotal()
 
@@ -341,9 +357,14 @@ export default function BillingContent() {
         description: `Token #${currentToken} | Total: ₹${total}`,
       })
 
-      // If this was a queued order, remove it from the queue
-      if (selectedQueuedOrder) {
-        setQueuedOrders((prev) => prev.filter((item) => item.id !== selectedQueuedOrder.id))
+      // If this was a queued order, remove it from the queue and Firebase
+      if (selectedQueuedOrder && selectedQueuedOrder.id) {
+        try {
+          await deleteTableOrder(selectedQueuedOrder.id)
+          setQueuedOrders((prev) => prev.filter((item) => item.id !== selectedQueuedOrder.id))
+        } catch (error) {
+          console.error("Error deleting table order:", error)
+        }
       }
 
       resetOrder()
@@ -354,7 +375,7 @@ export default function BillingContent() {
         description: "Failed to save bill",
       })
     }
-  }, [order, currentToken, calculateTotal, resetOrder, toast, selectedQueuedOrder])
+  }, [order, currentToken, calculateTotal, resetOrder, toast, selectedQueuedOrder, ensureOnline, menuItems])
 
   // Add function to save order to queue
   const handleSaveToQueue = useCallback(() => {
@@ -370,8 +391,15 @@ export default function BillingContent() {
     setShowQueueDialog(true)
   }, [order, customItems, toast])
 
-  // Add function to confirm saving to queue
-  const confirmSaveToQueue = useCallback(() => {
+  // Add function to confirm saving to queue (now saves to Firebase)
+  const confirmSaveToQueue = useCallback(async () => {
+    // Check internet connectivity before saving
+    const online = await ensureOnline()
+    if (!online) {
+      setShowQueueDialog(false)
+      return
+    }
+
     if (!tableNumber.trim()) {
       toast({
         title: "Error",
@@ -381,62 +409,36 @@ export default function BillingContent() {
       return
     }
 
-    // Check if table already exists
-    const existingTableIndex = queuedOrders.findIndex((order) => order.tableName === tableNumber)
-
-    if (existingTableIndex >= 0) {
-      // Merge orders for the same table
-      setQueuedOrders((prev) => {
-        const newOrders = [...prev]
-        const existingOrder = newOrders[existingTableIndex]
-
-        // Merge menu items
-        const mergedOrder = {
-          ...existingOrder,
-          order: {
-            ...existingOrder.order,
-            ...Object.entries(order).reduce(
-              (acc, [id, quantity]) => ({
-                ...acc,
-                [id]: (existingOrder.order[id] || 0) + quantity,
-              }),
-              {},
-            ),
-          },
-          // Merge custom items
-          customItems: [...existingOrder.customItems, ...customItems],
-          timestamp: new Date(), // Update timestamp to latest
-        }
-
-        newOrders[existingTableIndex] = mergedOrder
-        return newOrders
-      })
-
-      toast({
-        title: "Success",
-        description: `Order added to existing Table ${tableNumber}`,
-      })
-    } else {
-      // Create new table order
-      const newQueuedOrder: QueuedOrder = {
-        id: Date.now().toString(),
+    try {
+      // Save to Firebase
+      await saveTableOrder({
         tableName: tableNumber,
         order: { ...order },
         customItems: [...customItems],
         timestamp: new Date(),
-      }
+      })
 
-      setQueuedOrders((prev) => [...prev, newQueuedOrder])
+      // Reload table orders from Firebase to get updated list
+      const updatedTableOrders = await getTableOrders()
+      setQueuedOrders(updatedTableOrders)
+
       toast({
         title: "Success",
         description: `Order saved to Table ${tableNumber}`,
       })
-    }
 
-    setShowQueueDialog(false)
-    setTableNumber("")
-    resetOrder()
-  }, [tableNumber, order, customItems, resetOrder, toast, queuedOrders])
+      setShowQueueDialog(false)
+      setTableNumber("")
+      resetOrder()
+    } catch (error) {
+      console.error("Error saving to table:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save order to table. Please check your internet connection.",
+        variant: "destructive",
+      })
+    }
+  }, [tableNumber, order, customItems, resetOrder, toast, ensureOnline])
 
   // Add function to load order from queue
   const loadQueuedOrder = useCallback(
@@ -461,6 +463,10 @@ export default function BillingContent() {
   )
 
   const handleAddToMonthlyBill = useCallback(async () => {
+    // Check internet connectivity before saving
+    const online = await ensureOnline()
+    if (!online) return
+
     if (!selectedCustomer) {
       toast({
         title: "Error",
@@ -514,7 +520,7 @@ export default function BillingContent() {
         variant: "destructive",
       })
     }
-  }, [order, customItems, menuItems, selectedCustomer, resetOrder, toast])
+  }, [order, customItems, menuItems, selectedCustomer, resetOrder, toast, ensureOnline])
 
   const handleAddNewCustomer = useCallback(async () => {
     if (!newCustomerName.trim()) {
@@ -586,6 +592,63 @@ export default function BillingContent() {
 
     loadInitialData()
   }, [toast, loadMenuItems])
+
+  // Monitor internet connectivity
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      setShowOfflineDialog(false)
+      toast({
+        title: "Connected",
+        description: "Internet connection restored",
+      })
+      // Reload table orders from Firebase when connection is restored
+      loadTableOrdersFromFirebase()
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+      setShowOfflineDialog(true)
+    }
+
+    const loadTableOrdersFromFirebase = async () => {
+      try {
+        const tableOrders = await getTableOrders()
+        setQueuedOrders(tableOrders)
+      } catch (error) {
+        console.error("Error loading table orders:", error)
+      }
+    }
+
+    // Load table orders on mount
+    loadTableOrdersFromFirebase()
+
+    // Add event listeners
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    // Check initial status
+    if (!navigator.onLine) {
+      setIsOnline(false)
+      setShowOfflineDialog(true)
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
+  }, [toast])
+
+  // Helper function to check connection before operations
+  const ensureOnline = useCallback(async (): Promise<boolean> => {
+    const online = await checkInternetConnection()
+    if (!online) {
+      setIsOnline(false)
+      setShowOfflineDialog(true)
+      return false
+    }
+    return true
+  }, [])
 
   const toggleFavorite = useCallback(
     async (itemId: string) => {
@@ -1520,6 +1583,28 @@ export default function BillingContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Offline Alert Dialog */}
+      <AlertDialog open={showOfflineDialog} onOpenChange={setShowOfflineDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <WifiOff className="h-5 w-5 text-destructive" />
+              No Internet Connection
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You are currently offline. Billing operations require an internet connection to save data to the server.
+              <br /><br />
+              Please check your internet connection and try again. Your current order will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowOfflineDialog(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

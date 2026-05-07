@@ -1128,6 +1128,119 @@ export const deleteMonthlyCustomer = async (customerName: string) => {
   }
 }
 
+// Table Orders (Queue) functions
+export interface TableOrder {
+  id?: string
+  tableName: string
+  order: { [key: string]: number }
+  customItems: Array<{ name: string; price: number; quantity: number }>
+  timestamp: any
+  userId: string
+}
+
+export const saveTableOrder = async (tableOrder: Omit<TableOrder, "id" | "userId">) => {
+  try {
+    const user = auth.currentUser
+    if (!user) throw new Error("No authenticated user")
+
+    // Check if table already exists
+    const existingQuery = query(
+      collection(db, "tableOrders"),
+      where("userId", "==", user.uid),
+      where("tableName", "==", tableOrder.tableName)
+    )
+    const existingSnapshot = await getDocs(existingQuery)
+
+    if (!existingSnapshot.empty) {
+      // Update existing table order
+      const existingDoc = existingSnapshot.docs[0]
+      const existingData = existingDoc.data()
+      
+      // Merge orders
+      const mergedOrder: { [key: string]: number } = { ...existingData.order }
+      Object.entries(tableOrder.order).forEach(([id, quantity]) => {
+        mergedOrder[id] = (mergedOrder[id] || 0) + quantity
+      })
+
+      await setDoc(doc(db, "tableOrders", existingDoc.id), {
+        ...existingData,
+        order: mergedOrder,
+        customItems: [...(existingData.customItems || []), ...(tableOrder.customItems || [])],
+        timestamp: tableOrder.timestamp,
+      })
+      return existingDoc.id
+    } else {
+      // Create new table order
+      const docRef = await addDoc(collection(db, "tableOrders"), {
+        ...tableOrder,
+        userId: user.uid,
+      })
+      return docRef.id
+    }
+  } catch (error) {
+    console.error("Error saving table order:", error)
+    throw error
+  }
+}
+
+export const getTableOrders = async (): Promise<TableOrder[]> => {
+  try {
+    const user = auth.currentUser
+    if (!user) throw new Error("No authenticated user")
+
+    const q = query(collection(db, "tableOrders"), where("userId", "==", user.uid))
+    const querySnapshot = await getDocs(q)
+
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        tableName: data.tableName,
+        order: data.order || {},
+        customItems: data.customItems || [],
+        timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+        userId: data.userId,
+      }
+    })
+  } catch (error) {
+    console.error("Error getting table orders:", error)
+    throw error
+  }
+}
+
+export const deleteTableOrder = async (tableOrderId: string) => {
+  try {
+    const user = auth.currentUser
+    if (!user) throw new Error("No authenticated user")
+
+    await deleteDoc(doc(db, "tableOrders", tableOrderId))
+  } catch (error) {
+    console.error("Error deleting table order:", error)
+    throw error
+  }
+}
+
+// Check internet connectivity
+export const checkInternetConnection = async (): Promise<boolean> => {
+  try {
+    // First check navigator.onLine
+    if (!navigator.onLine) {
+      return false
+    }
+    
+    // Then try to reach Firebase to verify actual connectivity
+    const user = auth.currentUser
+    if (user) {
+      // Try a simple read operation to verify Firebase connectivity
+      await getDocs(query(collection(db, "menuItems"), where("userId", "==", user.uid)))
+    }
+    return true
+  } catch (error) {
+    console.error("Internet connectivity check failed:", error)
+    return false
+  }
+}
+
 export {
   saveOrder,
   getOrders,
