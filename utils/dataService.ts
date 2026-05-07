@@ -318,14 +318,24 @@ const getMonthlyBillItemsWithoutIndex = async (customerId: string, startDate: Da
   return querySnapshot.docs
     .map((doc) => {
       const data = doc.data()
+      // Handle both date and timestamp fields for backward compatibility
+      let itemDate: Date
+      if (data.date && typeof data.date.toDate === "function") {
+        itemDate = data.date.toDate()
+      } else if (data.timestamp && typeof data.timestamp.toDate === "function") {
+        itemDate = data.timestamp.toDate()
+      } else {
+        itemDate = new Date(data.date || data.timestamp)
+      }
       return {
         id: doc.id,
         ...data,
-        date: data.timestamp.toDate(),
+        date: itemDate,
+        timestamp: data.timestamp,
       }
     })
     .filter(
-      (item: MonthlyBillItem) =>
+      (item: any) =>
         item.userId === user.uid && item.customerId === customerId && item.date >= startDate && item.date <= endDate,
     ) as MonthlyBillItem[]
 }
@@ -1064,6 +1074,56 @@ export const deleteCategory = async (categoryId: string) => {
     await deleteDoc(doc(db, "categories", categoryId))
   } catch (error) {
     console.error("Error deleting category:", error)
+    throw error
+  }
+}
+
+export const deleteMonthlyCustomer = async (customerName: string) => {
+  try {
+    const user = auth.currentUser
+    if (!user) throw new Error("No authenticated user")
+
+    // Find and delete the customer document
+    const customerQuery = query(
+      collection(db, "monthlyBillCustomers"),
+      where("userId", "==", user.uid),
+      where("customerName", "==", customerName)
+    )
+    const customerSnapshot = await getDocs(customerQuery)
+    const customerDeletePromises = customerSnapshot.docs.map((docSnap) =>
+      deleteDoc(doc(db, "monthlyBillCustomers", docSnap.id))
+    )
+
+    // Find and delete all bill items for this customer
+    const billItemsQuery = query(
+      collection(db, "monthlyBillItems"),
+      where("userId", "==", user.uid),
+      where("customerId", "==", customerName)
+    )
+    const billItemsSnapshot = await getDocs(billItemsQuery)
+    const billItemsDeletePromises = billItemsSnapshot.docs.map((docSnap) =>
+      deleteDoc(doc(db, "monthlyBillItems", docSnap.id))
+    )
+
+    // Find and delete all payments for this customer
+    const paymentsQuery = query(
+      collection(db, "monthlyBillPayments"),
+      where("userId", "==", user.uid),
+      where("customerId", "==", customerName)
+    )
+    const paymentsSnapshot = await getDocs(paymentsQuery)
+    const paymentsDeletePromises = paymentsSnapshot.docs.map((docSnap) =>
+      deleteDoc(doc(db, "monthlyBillPayments", docSnap.id))
+    )
+
+    // Execute all deletes in parallel
+    await Promise.all([
+      ...customerDeletePromises,
+      ...billItemsDeletePromises,
+      ...paymentsDeletePromises,
+    ])
+  } catch (error) {
+    console.error("Error deleting monthly customer:", error)
     throw error
   }
 }

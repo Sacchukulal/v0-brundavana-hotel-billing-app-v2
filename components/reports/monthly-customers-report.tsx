@@ -15,6 +15,7 @@ import {
   saveMonthlyBillPayment,
   getMonthlyBillPayments,
   clearMonthlyBillData,
+  deleteMonthlyCustomer,
   type MonthlyBillItem,
   type MonthlyBillSummary,
   type MonthlyBillPayment,
@@ -43,6 +44,8 @@ export function MonthlyCustomersReport() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const { toast } = useToast()
   const [showClearConfirmDialog, setShowClearConfirmDialog] = useState(false)
+  const [showDeleteCustomerDialog, setShowDeleteCustomerDialog] = useState(false)
+  const [customerToDelete, setCustomerToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     loadMonthlyCustomers()
@@ -234,6 +237,46 @@ export function MonthlyCustomersReport() {
     }
   }
 
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return
+
+    try {
+      setShowDeleteCustomerDialog(false)
+
+      toast({
+        title: "Processing",
+        description: "Deleting customer...",
+      })
+
+      await deleteMonthlyCustomer(customerToDelete)
+
+      // Refresh the customer list
+      await loadMonthlyCustomers()
+
+      // Clear selected customer if it was deleted
+      if (selectedCustomer === customerToDelete) {
+        setSelectedCustomer(null)
+        setMonthlyBillItems([])
+        setMonthlyBillSummary(null)
+        setMonthlyBillPayments([])
+      }
+
+      setCustomerToDelete(null)
+
+      toast({
+        title: "Success",
+        description: "Customer deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting customer:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete customer: " + (error instanceof Error ? error.message : "Unknown error"),
+        variant: "destructive",
+      })
+    }
+  }
+
   if (loading) {
     return <div>Loading monthly customers...</div>
   }
@@ -256,9 +299,21 @@ export function MonthlyCustomersReport() {
               <TableRow key={customer}>
                 <TableCell>{customer}</TableCell>
                 <TableCell>
-                  <Button variant="outline" onClick={() => handleSelectCustomer(customer)}>
-                    View Details
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => handleSelectCustomer(customer)}>
+                      View Details
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => {
+                        setCustomerToDelete(customer)
+                        setShowDeleteCustomerDialog(true)
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -382,6 +437,33 @@ export function MonthlyCustomersReport() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Customer Confirmation Dialog */}
+        <AlertDialog open={showDeleteCustomerDialog} onOpenChange={setShowDeleteCustomerDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete &quot;{customerToDelete}&quot;? This will permanently remove:
+                <ul className="list-disc list-inside mt-2">
+                  <li>The customer record</li>
+                  <li>All bill items history</li>
+                  <li>All payment records</li>
+                </ul>
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCustomer}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete Customer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )
