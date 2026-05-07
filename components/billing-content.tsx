@@ -1584,9 +1584,9 @@ export default function BillingContent() {
         </DialogContent>
       </Dialog>
 
-      {/* Offline Alert Dialog */}
-      <AlertDialog open={showOfflineDialog} onOpenChange={setShowOfflineDialog}>
-        <AlertDialogContent>
+      {/* Offline Alert Dialog - Cannot be dismissed until online */}
+      <AlertDialog open={showOfflineDialog}>
+        <AlertDialogContent onEscapeKeyDown={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <WifiOff className="h-5 w-5 text-destructive" />
@@ -1595,12 +1595,32 @@ export default function BillingContent() {
             <AlertDialogDescription>
               You are currently offline. Billing operations require an internet connection to save data to the server.
               <br /><br />
-              Please check your internet connection and try again. Your current order will be preserved.
+              Please check your internet connection. This dialog will close automatically when connection is restored.
+              <br /><br />
+              <span className="text-muted-foreground text-sm">Your current order will be preserved.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowOfflineDialog(false)}>
-              OK
+            <AlertDialogAction 
+              onClick={async () => {
+                const online = await checkInternetConnection()
+                if (online) {
+                  setIsOnline(true)
+                  setShowOfflineDialog(false)
+                  toast({
+                    title: "Connected",
+                    description: "Internet connection restored",
+                  })
+                } else {
+                  toast({
+                    title: "Still Offline",
+                    description: "Please check your internet connection",
+                    variant: "destructive",
+                  })
+                }
+              }}
+            >
+              Retry Connection
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
