@@ -234,6 +234,17 @@ export default function BillingContent() {
     }
   }, [order, menuItems, parcelItems, categories, toast, printedCategories, currentToken])
 
+  // Helper function to check connection before operations
+  const ensureOnline = useCallback(async (): Promise<boolean> => {
+    const online = await checkInternetConnection()
+    if (!online) {
+      setIsOnline(false)
+      setShowOfflineDialog(true)
+      return false
+    }
+    return true
+  }, [])
+
   // Update the handlePrintBill function to include parcel information
   const handlePrintBill = useCallback(async () => {
     // Check internet connectivity before saving
@@ -638,17 +649,6 @@ export default function BillingContent() {
       window.removeEventListener("offline", handleOffline)
     }
   }, [toast])
-
-  // Helper function to check connection before operations
-  const ensureOnline = useCallback(async (): Promise<boolean> => {
-    const online = await checkInternetConnection()
-    if (!online) {
-      setIsOnline(false)
-      setShowOfflineDialog(true)
-      return false
-    }
-    return true
-  }, [])
 
   const toggleFavorite = useCallback(
     async (itemId: string) => {
