@@ -29,10 +29,23 @@ const LoadingCard = () => (
 const SplashScreen = () => (
   <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center z-50">
     <div className="text-center space-y-6">
-      {/* Animated Logo */}
+      {/* Animated Logo Container with Image */}
       <div className="flex justify-center">
-        <div className="relative w-32 h-32 animate-spin" style={{ animationDuration: "3s" }}>
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-500 border-r-green-500"></div>
+        <div className="relative w-40 h-40">
+          {/* Spinning border circle */}
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-500 border-r-green-500 animate-spin" style={{ animationDuration: "3s" }}></div>
+          
+          {/* Logo image centered inside */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Image
+              src="/brundavana-logo.png"
+              alt="Brundavana Logo"
+              width={120}
+              height={120}
+              className="object-contain"
+              priority
+            />
+          </div>
         </div>
       </div>
       
@@ -65,15 +78,6 @@ export default function DashboardContent() {
   const { toast } = useToast()
 
   useEffect(() => {
-    // Show splash screen for 2 seconds on component mount
-    const splashTimer = setTimeout(() => {
-      setShowSplash(false)
-    }, 2000)
-
-    return () => clearTimeout(splashTimer)
-  }, [])
-
-  useEffect(() => {
     const loadDashboardData = async () => {
       try {
         const [orders, dashboardStats] = await Promise.all([getOrders(), getDashboardStats()])
@@ -86,6 +90,12 @@ export default function DashboardContent() {
 
         setRecentOrders(processedOrders.slice(0, 5))
         setStats(dashboardStats)
+        setLoading(false)
+        
+        // Show splash for minimum 2 seconds, then hide
+        setTimeout(() => {
+          setShowSplash(false)
+        }, 2000)
       } catch (error) {
         console.error("Error loading dashboard data:", error)
         toast({
@@ -93,15 +103,13 @@ export default function DashboardContent() {
           description: "Failed to load dashboard data",
           variant: "destructive",
         })
-      } finally {
         setLoading(false)
+        setShowSplash(false)
       }
     }
 
-    if (!showSplash) {
-      loadDashboardData()
-    }
-  }, [showSplash, toast])
+    loadDashboardData()
+  }, [toast])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
