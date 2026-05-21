@@ -366,8 +366,15 @@ export default function BillingContent() {
       return
     }
 
+    // Pre-fill table number if editing existing table
+    if (selectedQueuedOrder) {
+      setTableNumber(selectedQueuedOrder.tableName)
+    } else {
+      setTableNumber("")
+    }
+
     setShowQueueDialog(true)
-  }, [order, customItems, toast])
+  }, [order, customItems, toast, selectedQueuedOrder])
 
   // Add function to confirm saving to queue (now saves to Firebase)
   const confirmSaveToQueue = useCallback(async () => {
@@ -388,7 +395,16 @@ export default function BillingContent() {
     }
 
     try {
-      // Save to Firebase
+      // If editing an existing table, delete the old one first
+      if (selectedQueuedOrder && selectedQueuedOrder.id) {
+        try {
+          await deleteTableOrder(selectedQueuedOrder.id)
+        } catch (error) {
+          console.error("Error deleting old table order:", error)
+        }
+      }
+
+      // Save to Firebase (this will create new or merge if same table name)
       await saveTableOrder({
         tableName: tableNumber,
         order: { ...order },
@@ -402,11 +418,12 @@ export default function BillingContent() {
 
       toast({
         title: "Success",
-        description: `Order saved to Table ${tableNumber}`,
+        description: selectedQueuedOrder ? `Table ${tableNumber} updated successfully` : `Order saved to Table ${tableNumber}`,
       })
 
       setShowQueueDialog(false)
       setTableNumber("")
+      setSelectedQueuedOrder(null)
       resetOrder()
     } catch (error) {
       console.error("Error saving to table:", error)
@@ -416,7 +433,7 @@ export default function BillingContent() {
         variant: "destructive",
       })
     }
-  }, [tableNumber, order, customItems, resetOrder, toast, ensureOnline])
+  }, [tableNumber, order, customItems, resetOrder, toast, ensureOnline, selectedQueuedOrder])
 
   // Add function to load order from queue
   const loadQueuedOrder = useCallback(
@@ -1332,9 +1349,9 @@ export default function BillingContent() {
               <Button onClick={resetOrder} className="flex-1 bg-red-500 hover:bg-red-600 text-white border-0">
                 Clear
               </Button>
-              <Button onClick={handleSaveToQueue} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white border-0">
-                Save to Table
-              </Button>
+  <Button onClick={handleSaveToQueue} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white border-0">
+  {selectedQueuedOrder ? "Save Changes" : "Save to Table"}
+  </Button>
             </div>
 
             {/* Queued Orders Section */}
