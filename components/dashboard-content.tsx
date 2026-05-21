@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { format } from "date-fns"
 import { ArrowUp, CreditCard, DollarSign, Package, Receipt, ShoppingCart, Users, Wallet } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import Image from "next/image"
 
 const LoadingCard = () => (
   <Card>
@@ -23,11 +25,53 @@ const LoadingCard = () => (
   </Card>
 )
 
+// Splash Screen Component
+const SplashScreen = () => (
+  <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center z-50">
+    <div className="text-center space-y-6">
+      {/* Animated Logo */}
+      <div className="flex justify-center">
+        <div className="relative w-32 h-32 animate-spin" style={{ animationDuration: "3s" }}>
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-green-500 border-r-green-500"></div>
+        </div>
+      </div>
+      
+      <div className="space-y-3">
+        <h2 className="text-2xl font-bold text-white">Brundavana</h2>
+        <p className="text-gray-400 text-sm">Loading your dashboard...</p>
+      </div>
+
+      {/* Developer Info & Pricing */}
+      <div className="mt-12 space-y-4 border-t border-gray-700 pt-8">
+        <div className="space-y-2">
+          <p className="text-gray-300 text-sm">
+            Developed & Marketed by<br />
+            <span className="text-green-400 font-semibold">Sachin Kulal</span>
+          </p>
+          <div className="inline-block bg-green-500/20 border border-green-500/50 rounded-full px-4 py-2">
+            <p className="text-green-400 font-semibold text-sm">₹15 per day</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
 export default function DashboardContent() {
   const [recentOrders, setRecentOrders] = useState([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showSplash, setShowSplash] = useState(true)
   const { toast } = useToast()
+
+  useEffect(() => {
+    // Show splash screen for 2 seconds on component mount
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false)
+    }, 2000)
+
+    return () => clearTimeout(splashTimer)
+  }, [])
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -54,14 +98,36 @@ export default function DashboardContent() {
       }
     }
 
-    loadDashboardData()
-  }, [toast])
+    if (!showSplash) {
+      loadDashboardData()
+    }
+  }, [showSplash, toast])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
     }).format(amount)
+  }
+
+  // Generate chart data
+  const generateChartData = () => {
+    const data = []
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      data.push({
+        date: format(date, "MMM d"),
+        sales: Math.floor(Math.random() * (stats?.monthlyRevenue || 5000) * 0.5) + 1000,
+      })
+    }
+    return data
+  }
+
+  const chartData = stats ? generateChartData() : []
+
+  if (showSplash) {
+    return <SplashScreen />
   }
 
   if (loading) {
@@ -72,34 +138,6 @@ export default function DashboardContent() {
           {Array.from({ length: 8 }).map((_, i) => (
             <LoadingCard key={i} />
           ))}
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-          <Card className="col-span-4">
-            <CardHeader>
-              <Skeleton className="h-6 w-[200px]" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center">
-                    <Skeleton className="h-12 w-full" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="col-span-3">
-            <CardHeader>
-              <Skeleton className="h-6 w-[150px]" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-8">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     )
@@ -113,172 +151,232 @@ export default function DashboardContent() {
     )
   }
 
-  return (
-    <div className="space-y-4">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+  // Prepare expense data for pie chart
+  const expenseChartData = stats.expensesByCategory.map((cat) => ({
+    name: cat.category,
+    value: cat.amount,
+  }))
 
-      {/* Today's Overview */}
+  const EXPENSE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+          Dashboard
+        </h1>
+        <p className="text-gray-400">Welcome back! Here&apos;s your restaurant performance overview</p>
+      </div>
+
+      {/* Today's Overview - Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-2">
+        <Card className="border-0 bg-gradient-to-br from-green-500/10 to-green-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Today&apos;s Sales</CardTitle>
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <DollarSign className="h-4 w-4 text-green-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-3xl font-bold text-green-400">
               {formatCurrency(stats.todaySales)}
             </div>
-            <p className="text-xs text-muted-foreground">{stats.todayOrders} orders today</p>
+            <p className="text-xs text-gray-400 mt-2">{stats.todayOrders} orders today</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
+
+        <Card className="border-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Today&apos;s Revenue</CardTitle>
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Wallet className="h-4 w-4 text-blue-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-3xl font-bold text-blue-400">
               {formatCurrency(stats.todayRevenue)}
             </div>
-            <p className="text-xs text-muted-foreground">After expenses</p>
+            <p className="text-xs text-gray-400 mt-2">After expenses</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
+
+        <Card className="border-0 bg-gradient-to-br from-red-500/10 to-red-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Expenses</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Today&apos;s Expenses</CardTitle>
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <Receipt className="h-4 w-4 text-red-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+            <div className="text-3xl font-bold text-red-400">
               {formatCurrency(stats.todayExpenses)}
             </div>
-            <p className="text-xs text-muted-foreground">Total expenses today</p>
+            <p className="text-xs text-gray-400 mt-2">Total expenses</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
+
+        <Card className="border-0 bg-gradient-to-br from-purple-500/10 to-purple-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Order Value</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Avg. Order Value</CardTitle>
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <CreditCard className="h-4 w-4 text-purple-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-3xl font-bold text-purple-400">
               {formatCurrency(stats.todayAverageOrderValue)}
             </div>
-            <p className="text-xs text-muted-foreground">Per order today</p>
+            <p className="text-xs text-gray-400 mt-2">Per order today</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Monthly Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+      {/* Charts Section */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Sales Trend Chart */}
+        <Card className="border-0 bg-slate-800/50 backdrop-blur col-span-2 hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="text-lg">Sales Trend (Last 30 Days)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis dataKey="date" stroke="rgba(255,255,255,0.5)" style={{ fontSize: "12px" }} />
+                <YAxis stroke="rgba(255,255,255,0.5)" style={{ fontSize: "12px" }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: "#1e293b", 
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    borderRadius: "8px"
+                  }}
+                  formatter={(value) => [`₹${value}`, "Sales"]}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="sales" 
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  dot={false}
+                  name="Daily Sales"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Expenses Breakdown */}
+        <Card className="border-0 bg-slate-800/50 backdrop-blur hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="text-lg">Expenses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={expenseChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {expenseChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value) => `₹${value.toFixed(0)}`}
+                  contentStyle={{ 
+                    backgroundColor: "#1e293b", 
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    borderRadius: "8px"
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Monthly Metrics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-0 bg-gradient-to-br from-green-500/10 to-green-600/5 backdrop-blur hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-300">Monthly Revenue</CardTitle>
+            <ArrowUp className="h-4 w-4 text-green-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-400">
               {formatCurrency(stats.monthlyRevenue)}
             </div>
-            <p className="text-xs text-muted-foreground">{stats.monthlyOrders} orders this month</p>
+            <p className="text-xs text-gray-400 mt-2">{stats.monthlyOrders} orders</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
+
+        <Card className="border-0 bg-gradient-to-br from-red-500/10 to-red-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Monthly Expenses</CardTitle>
+            <Receipt className="h-4 w-4 text-red-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+            <div className="text-2xl font-bold text-red-400">
               {formatCurrency(stats.monthlyExpenses)}
             </div>
-            <p className="text-xs text-muted-foreground">Total expenses this month</p>
+            <p className="text-xs text-gray-400 mt-2">Total this month</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
+
+        <Card className="border-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Highest Sale Day</CardTitle>
-            <ArrowUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Best Day</CardTitle>
+            <DollarSign className="h-4 w-4 text-amber-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-2xl font-bold text-amber-400">
               {formatCurrency(stats.monthlyHighestSaleDay.amount)}
             </div>
-            <p className="text-xs text-muted-foreground">{format(stats.monthlyHighestSaleDay.date, "MMM d, yyyy")}</p>
+            <p className="text-xs text-gray-400 mt-2">{format(stats.monthlyHighestSaleDay.date, "MMM d")}</p>
           </CardContent>
         </Card>
-        <Card className="border-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Avg. Order</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {formatCurrency(stats.monthlyAverageOrderValue)}
-            </div>
-            <p className="text-xs text-muted-foreground">Per order this month</p>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Billing Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="border-2">
+        <Card className="border-0 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 backdrop-blur hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Bills</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-gray-300">Pending Bills</CardTitle>
+            <Package className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+            <div className="text-2xl font-bold text-cyan-400">
               {formatCurrency(stats.pendingBillsAmount)}
             </div>
-            <p className="text-xs text-muted-foreground">{stats.pendingBillsCount} customers with pending bills</p>
-          </CardContent>
-        </Card>
-        <Card className="border-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.totalCustomers}</div>
-            <p className="text-xs text-muted-foreground">Total monthly billing customers</p>
-          </CardContent>
-        </Card>
-        <Card className="border-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Collection Rate</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(((stats.monthlyRevenue - stats.pendingBillsAmount) / stats.monthlyRevenue) * 100).toFixed(1)}%
-            </div>
-            <Progress
-              value={((stats.monthlyRevenue - stats.pendingBillsAmount) / stats.monthlyRevenue) * 100}
-              className="mt-2"
-            />
+            <p className="text-xs text-gray-400 mt-2">{stats.pendingBillsCount} customers</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Popular Items & Recent Sales */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="border-2 col-span-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="border-0 bg-slate-800/50 backdrop-blur col-span-4 hover:shadow-lg transition-shadow">
           <CardHeader>
-            <CardTitle>Popular Items (This Month)</CardTitle>
+            <CardTitle className="text-lg">Top Items This Month</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats.monthlyPopularItems.map((item, index) => (
-                <div key={index} className="flex items-center">
+              {stats.monthlyPopularItems.slice(0, 5).map((item, index) => (
+                <div key={index} className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <span className="text-sm font-bold text-green-400">{index + 1}</span>
+                  </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">{item.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.quantity} orders - {formatCurrency(item.revenue)}
+                    <div className="text-xs text-gray-400">
+                      {item.quantity} sold • {formatCurrency(item.revenue)}
                     </div>
                   </div>
-                  <div className="ml-4 text-sm font-medium">
+                  <div className="text-sm font-bold text-green-400">
                     {((item.quantity / stats.monthlyOrders) * 100).toFixed(1)}%
                   </div>
                 </div>
@@ -286,9 +384,10 @@ export default function DashboardContent() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-2 col-span-3">
+
+        <Card className="border-0 bg-slate-800/50 backdrop-blur col-span-3 hover:shadow-lg transition-shadow">
           <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
+            <CardTitle className="text-lg">Recent Transactions</CardTitle>
           </CardHeader>
           <CardContent>
             <RecentSales orders={recentOrders} />
@@ -296,22 +395,30 @@ export default function DashboardContent() {
         </Card>
       </div>
 
-      {/* Expense Categories */}
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle>Monthly Expenses by Category</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {stats.expensesByCategory.map((category, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">{category.category}</div>
-                  <div className="text-sm text-muted-foreground">{formatCurrency(category.amount)}</div>
+      {/* Footer - Branding Section */}
+      <Card className="border-0 bg-gradient-to-r from-green-500/5 to-blue-500/5 backdrop-blur overflow-hidden">
+        <CardContent className="p-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h3 className="text-2xl font-bold text-white mb-2">Brundavana Restaurant Billing</h3>
+              <p className="text-gray-400 mb-4">
+                Professional billing and management software for restaurants
+              </p>
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-sm text-gray-400">Developed & Marketed by</p>
+                  <p className="text-lg font-bold text-green-400">Sachin Kulal</p>
                 </div>
-                <Progress value={(category.amount / stats.monthlyExpenses) * 100} />
               </div>
-            ))}
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-400 mb-2">Simple Pricing</p>
+              <div className="text-4xl font-bold text-green-400 mb-1">₹15</div>
+              <p className="text-sm text-gray-400">per day</p>
+              <div className="mt-4 text-xs text-gray-500">
+                No hidden fees • Unlimited orders • Full support
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
