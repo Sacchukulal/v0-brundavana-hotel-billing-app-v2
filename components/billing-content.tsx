@@ -76,7 +76,6 @@ export default function BillingContent() {
   const [selectedQueuedOrder, setSelectedQueuedOrder] = useState<QueuedOrder | null>(null)
 
   const [parcelItems, setParcelItems] = useState<Set<string>>(new Set())
-  const [printedCategories, setPrintedCategories] = useState<Set<string>>(new Set())
   const [isOnline, setIsOnline] = useState(true)
   const [showOfflineDialog, setShowOfflineDialog] = useState(false)
 
@@ -134,54 +133,6 @@ export default function BillingContent() {
   // Update the handlePrintKOT function to print both table and parcel KOTs sequentially
   const handlePrintKOT = useCallback(async () => {
     try {
-      // Check if there are any items in the order
-      if (Object.keys(order).length === 0) {
-        toast({
-          title: "Error",
-          description: "No items in the order",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Group items by category
-      const itemsByCategory = new Map<string, { [key: string]: number }>()
-
-      Object.entries(order).forEach(([id, quantity]) => {
-        const item = menuItems.find((item) => item.id === id)
-        if (item) {
-          // Find the category name for this item
-          let categoryName = "Others"
-          const category = categories.find((cat) => cat.id === item.section || cat.name === item.section)
-          if (category) {
-            categoryName = category.name
-          }
-
-          if (!itemsByCategory.has(categoryName)) {
-            itemsByCategory.set(categoryName, {})
-          }
-
-          const categoryItems = itemsByCategory.get(categoryName)!
-          categoryItems[id] = quantity
-        }
-      })
-
-      // Get all category names
-      const allCategories = Array.from(itemsByCategory.keys())
-
-      // Find the next category to print (one that hasn't been printed yet)
-      const nextCategoryToPrint = allCategories.find((cat) => !printedCategories.has(cat))
-
-      if (!nextCategoryToPrint) {
-        // All categories have been printed, reset and start over
-        setPrintedCategories(new Set())
-        toast({
-          title: "All KOTs printed",
-          description: "All categories have been printed. Click again to reprint.",
-        })
-        return
-      }
-
       // Generate token number if not already set
       let tokenNumber = currentToken
       if (!tokenNumber) {
@@ -189,21 +140,41 @@ export default function BillingContent() {
         setCurrentToken(tokenNumber)
       }
 
-      // Print KOT for the next category
-      const categoryItems = itemsByCategory.get(nextCategoryToPrint)!
-      const { content } = generateKOTContent(
-        categoryItems,
-        menuItems,
-        "Table",
-        tokenNumber,
-        parcelItems,
-        nextCategoryToPrint,
-      )
+      // Separate items into parcel and table items
+      const parcelOrder: { [key: string]: number } = {}
+      const tableOrder: { [key: string]: number } = {}
 
-      await printThermal(content, "KOT")
+      Object.entries(order).forEach(([id, quantity]) => {
+        if (parcelItems.has(id)) {
+          parcelOrder[id] = quantity
+        } else {
+          tableOrder[id] = quantity
+        }
+      })
 
-      // Mark this category as printed
-      setPrintedCategories((prev) => new Set([...prev, nextCategoryToPrint]))
+      // Print parcel KOT if there are parcel items
+      if (Object.keys(parcelOrder).length > 0) {
+        const { content: parcelContent } = generateKOTContent(
+          parcelOrder,
+          menuItems,
+          "Parcel",
+          tokenNumber,
+          parcelItems,
+        )
+        await printThermal(parcelContent, "KOT")
+      }
+
+      // Print table KOT if there are table items
+      if (Object.keys(tableOrder).length > 0) {
+        const { content: tableContent } = generateKOTContent(
+          tableOrder,
+          menuItems,
+          "Table",
+          tokenNumber,
+          parcelItems,
+        )
+        await printThermal(tableContent, "KOT")
+      }
 
       // Refocus the search input after printing
       setTimeout(() => {
@@ -212,17 +183,13 @@ export default function BillingContent() {
         }
       }, 100)
 
-      const remainingCategories = allCategories.filter(
-        (cat) => !printedCategories.has(cat) && cat !== nextCategoryToPrint,
-      )
-      const statusMessage =
-        remainingCategories.length > 0
-          ? `${nextCategoryToPrint} printed. ${remainingCategories.length} more categories remaining.`
-          : `${nextCategoryToPrint} printed. All categories completed!`
+      const kotTypes = []
+      if (Object.keys(parcelOrder).length > 0) kotTypes.push("Parcel")
+      if (Object.keys(tableOrder).length > 0) kotTypes.push("Table")
 
       toast({
-        title: "KOT printed",
-        description: `Token #${tokenNumber} - ${statusMessage}`,
+        title: "KOTs printed successfully",
+        description: `Token #${tokenNumber} - ${kotTypes.join(" & ")} KOT(s) printed`,
       })
     } catch (error) {
       console.error("Error printing KOT:", error)
@@ -232,7 +199,7 @@ export default function BillingContent() {
         variant: "destructive",
       })
     }
-  }, [order, menuItems, parcelItems, categories, toast, printedCategories, currentToken])
+  }, [order, menuItems, parcelItems, toast, currentToken])
 
   // Helper function to check connection before operations
   const ensureOnline = useCallback(async (): Promise<boolean> => {

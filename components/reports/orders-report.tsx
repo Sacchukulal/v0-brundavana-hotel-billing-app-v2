@@ -29,6 +29,11 @@ export function OrdersReport() {
     loadOrders()
   }, [])
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [startDate, endDate])
+
   const loadOrders = async () => {
     try {
       setLoading(true)
@@ -39,9 +44,18 @@ export function OrdersReport() {
 
       // Sort orders by timestamp in descending order (newest first)
       const sortedOrders = printedBills.sort((a, b) => {
-        const dateA = a.timestamp.toDate()
-        const dateB = b.timestamp.toDate()
-        return dateB.getTime() - dateA.getTime()
+        const getTime = (timestamp: any): number => {
+          if (timestamp && typeof timestamp.toDate === "function") {
+            return timestamp.toDate().getTime()
+          } else if (timestamp instanceof Date) {
+            return timestamp.getTime()
+          } else {
+            return new Date(timestamp).getTime()
+          }
+        }
+        const dateA = getTime(a.timestamp)
+        const dateB = getTime(b.timestamp)
+        return dateB - dateA
       })
 
       // Remove duplicate token numbers (keep only the most recent)
@@ -116,7 +130,15 @@ export function OrdersReport() {
 
   // Filter orders by date range
   const filteredOrders = orders.filter((order) => {
-    const orderDate = order.timestamp.toDate()
+    // Handle both Firestore Timestamp and regular Date objects
+    let orderDate: Date
+    if (order.timestamp && typeof order.timestamp.toDate === "function") {
+      orderDate = order.timestamp.toDate()
+    } else if (order.timestamp instanceof Date) {
+      orderDate = order.timestamp
+    } else {
+      orderDate = new Date(order.timestamp)
+    }
 
     if (startDate) {
       const start = new Date(startDate)
