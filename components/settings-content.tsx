@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Trash2, Pencil } from "lucide-react"
+import { Plus, Trash2, Pencil, RefreshCw } from "lucide-react"
 
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => any {
   let timeout: NodeJS.Timeout | null = null
@@ -56,6 +56,7 @@ export default function SettingsContent() {
   const [showEditItemDialog, setShowEditItemDialog] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [editItemForm, setEditItemForm] = useState({ name: "", price: "" })
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Fix for items not loading on first visit - use persistent auth state listener
   useEffect(() => {
@@ -404,6 +405,29 @@ export default function SettingsContent() {
     }
   }
 
+  const handleRefreshMenuItems = async () => {
+    try {
+      setIsRefreshing(true)
+      const [items, cats] = await Promise.all([getMenuItems(), getCategories()])
+      setMenuItems(items)
+      setCategories(cats)
+      
+      toast({
+        title: "Success",
+        description: "Menu items refreshed successfully.",
+      })
+    } catch (error) {
+      console.error("Error refreshing menu items:", error)
+      toast({
+        title: "Error",
+        description: "Failed to refresh menu items. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -552,8 +576,18 @@ export default function SettingsContent() {
 
       {/* Menu Items List */}
       <Card className="border-2">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Menu Items</CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleRefreshMenuItems}
+            disabled={isRefreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </CardHeader>
         <CardContent>
           {categories.map((category) => {
