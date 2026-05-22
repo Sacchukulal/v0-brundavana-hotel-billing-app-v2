@@ -22,7 +22,7 @@ export function OrdersReport() {
   const [currentPage, setCurrentPage] = useState(1)
   const [startDate, setStartDate] = useState<Date | undefined>(undefined)
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
-  const ordersPerPage = 10
+  const ordersPerPage = 50
   const { toast } = useToast()
 
   useEffect(() => {
@@ -58,18 +58,7 @@ export function OrdersReport() {
         return dateB - dateA
       })
 
-      // Remove duplicate token numbers (keep only the most recent)
-      const uniqueTokenOrders: Order[] = []
-      const tokenSet = new Set<string>()
-
-      sortedOrders.forEach((order) => {
-        if (order.tokenNumber && !tokenSet.has(order.tokenNumber)) {
-          tokenSet.add(order.tokenNumber)
-          uniqueTokenOrders.push(order)
-        }
-      })
-
-      setOrders(uniqueTokenOrders)
+      setOrders(sortedOrders)
     } catch (error) {
       console.error("Error loading orders:", error)
       toast({
@@ -228,6 +217,11 @@ export function OrdersReport() {
           <Button variant="outline" onClick={resetFilters}>
             Reset Filters
           </Button>
+        </div>
+
+        {/* Results Summary */}
+        <div className="mb-4 text-sm text-gray-600">
+          Showing {currentOrders.length > 0 ? startIndex + 1 : 0}-{Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} bills
         </div>
 
         <Table>
