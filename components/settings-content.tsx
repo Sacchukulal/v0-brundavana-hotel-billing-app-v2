@@ -263,22 +263,30 @@ export default function SettingsContent() {
     // Prevent multiple delete clicks on the same item
     if (deletingItemId === id) return
     
+    console.log("[v0] Starting delete for item:", id)
     setDeletingItemId(id)
     try {
+      console.log("[v0] Calling deleteMenuItem for:", id)
       await deleteMenuItem(id)
-      setMenuItems((prev) => prev.filter((item) => item.id !== id))
+      console.log("[v0] Delete successful, updating state")
+      setMenuItems((prev) => {
+        const filtered = prev.filter((item) => item.id !== id)
+        console.log("[v0] Filtered items count:", filtered.length)
+        return filtered
+      })
       toast({
         title: "Success",
         description: "Menu item deleted successfully.",
       })
     } catch (error) {
-      console.error("Error deleting menu item:", error)
+      console.error("[v0] Error deleting menu item:", error)
       toast({
         title: "Error",
-        description: "Failed to delete menu item. Please try again.",
+        description: `Failed to delete menu item: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       })
     } finally {
+      console.log("[v0] Setting deletingItemId to null")
       setDeletingItemId(null)
     }
   }
