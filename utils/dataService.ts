@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc, updateDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc, updateDoc, setDoc } from "firebase/firestore"
 import { db, auth } from "./firebase"
 
 export interface MenuItem {
@@ -107,9 +107,9 @@ const saveMenuItem = async (item: MenuItem | Omit<MenuItem, "id" | "userId">) =>
       userId: user.uid,
     }
 
-    // If item has an id, update the existing document
+    // If item has an id, use setDoc with merge to create or update the document
     if ("id" in item && item.id) {
-      await updateDoc(doc(db, "menuItems", item.id), menuItemData)
+      await setDoc(doc(db, "menuItems", item.id), menuItemData, { merge: true })
       return item.id
     } else {
       // Create new document if no id
