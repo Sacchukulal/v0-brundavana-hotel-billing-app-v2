@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc, updateDoc, setDoc } from "firebase/firestore"
 import { db, auth } from "./firebase"
 
 export interface MenuItem {
@@ -97,7 +97,7 @@ const getOrders = async () => {
   }
 }
 
-const saveMenuItem = async (item: Omit<MenuItem, "id" | "userId">) => {
+const saveMenuItem = async (item: MenuItem | Omit<MenuItem, "id" | "userId">) => {
   try {
     const user = auth.currentUser
     if (!user) throw new Error("No authenticated user")
@@ -107,8 +107,15 @@ const saveMenuItem = async (item: Omit<MenuItem, "id" | "userId">) => {
       userId: user.uid,
     }
 
-    const docRef = await addDoc(collection(db, "menuItems"), menuItemData)
-    return docRef.id
+    // If item has an id, use setDoc with merge to create or update the document
+    if ("id" in item && item.id) {
+      await setDoc(doc(db, "menuItems", item.id), menuItemData, { merge: true })
+      return item.id
+    } else {
+      // Create new document if no id
+      const docRef = await addDoc(collection(db, "menuItems"), menuItemData)
+      return docRef.id
+    }
   } catch (error) {
     console.error("Error saving menu item:", error)
     throw error
@@ -123,12 +130,41 @@ const getMenuItems = async () => {
     const q = query(collection(db, "menuItems"), where("userId", "==", user.uid))
     const querySnapshot = await getDocs(q)
 
-    return querySnapshot.docs.map((doc) => ({
+    const items = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     })) as MenuItem[]
+    
+    // Deduplicate items by ID, keeping the first occurrence
+    const uniqueItemsMap = new Map<string, MenuItem>()
+    items.forEach((item) => {
+      if (!uniqueItemsMap.has(item.id)) {
+        uniqueItemsMap.set(item.id, item)
+      }
+    })
+    
+    const uniqueItems = Array.from(uniqueItemsMap.values())
+    
+    // Silently deduplicate - duplicates are removed automatically on load
+    
+    // Clean up duplicate documents from database if found
+    if (uniqueItems.length !== items.length) {
+      const seenIds = new Set<string>()
+      items.forEach((item) => {
+        if (seenIds.has(item.id)) {
+          // This is a duplicate - delete it from the database
+          deleteDoc(doc(db, "menuItems", item.id)).catch((error) => {
+            console.error("Failed to cleanup duplicate:", error)
+          })
+        } else {
+          seenIds.add(item.id)
+        }
+      })
+    }
+    
+    return uniqueItems
   } catch (error) {
-    console.error("Error getting menu items:", error)
+    console.error("[v0] Error getting menu items:", error)
     throw new Error("Failed to load menu items. Please ensure you are logged in.")
   }
 }
@@ -345,7 +381,8 @@ const deleteMenuItem = async (itemId: string) => {
     const user = auth.currentUser
     if (!user) throw new Error("No authenticated user")
 
-    await deleteDoc(doc(db, "menuItems", itemId))
+    const docRef = doc(db, "menuItems", itemId)
+    await deleteDoc(docRef)
   } catch (error) {
     console.error("Error deleting menu item:", error)
     throw error

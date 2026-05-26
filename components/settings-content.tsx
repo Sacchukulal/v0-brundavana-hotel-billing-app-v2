@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { auth } from "@/utils/firebase"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Trash2, Pencil } from "lucide-react"
+import { Plus, Trash2, Pencil, RefreshCw } from "lucide-react"
 
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => any {
   let timeout: NodeJS.Timeout | null = null
@@ -56,6 +56,8 @@ export default function SettingsContent() {
   const [showEditItemDialog, setShowEditItemDialog] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [editItemForm, setEditItemForm] = useState({ name: "", price: "" })
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
   // Fix for items not loading on first visit - use persistent auth state listener
   useEffect(() => {
@@ -258,9 +260,13 @@ export default function SettingsContent() {
   )[0]
 
   const handleDeleteItem = async (id: string) => {
+    // Prevent multiple delete clicks on the same item
+    if (deletingItemId === id) return
+    
+    setDeletingItemId(id)
     try {
       await deleteMenuItem(id)
-      setMenuItems(menuItems.filter((item) => item.id !== id))
+      setMenuItems((prev) => prev.filter((item) => item.id !== id))
       toast({
         title: "Success",
         description: "Menu item deleted successfully.",
@@ -272,6 +278,8 @@ export default function SettingsContent() {
         description: "Failed to delete menu item. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setDeletingItemId(null)
     }
   }
 
@@ -323,7 +331,10 @@ export default function SettingsContent() {
   const handleEditItemSubmit = async () => {
     if (!editingItem) return
 
-    if (!editItemForm.name.trim() || !editItemForm.price.trim()) {
+    const trimmedName = editItemForm.name.trim()
+    const trimmedPrice = editItemForm.price.trim()
+
+    if (!trimmedName || !trimmedPrice) {
       toast({
         title: "Error",
         description: "Please fill in all fields.",
@@ -332,11 +343,21 @@ export default function SettingsContent() {
       return
     }
 
+    const priceNum = Number(trimmedPrice)
+    if (isNaN(priceNum) || priceNum < 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid price.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const updatedItem = {
         ...editingItem,
-        name: editItemForm.name,
-        price: Number(editItemForm.price),
+        name: trimmedName,
+        price: priceNum,
       }
 
       await saveMenuItem(updatedItem)
@@ -347,6 +368,7 @@ export default function SettingsContent() {
 
       setShowEditItemDialog(false)
       setEditingItem(null)
+      setEditItemForm({ name: "", price: "" })
 
       toast({
         title: "Success",
@@ -404,6 +426,29 @@ export default function SettingsContent() {
     }
   }
 
+  const handleRefreshMenuItems = async () => {
+    try {
+      setIsRefreshing(true)
+      const [items, cats] = await Promise.all([getMenuItems(), getCategories()])
+      setMenuItems(items)
+      setCategories(cats)
+      
+      toast({
+        title: "Success",
+        description: "Menu items refreshed successfully.",
+      })
+    } catch (error) {
+      console.error("Error refreshing menu items:", error)
+      toast({
+        title: "Error",
+        description: "Failed to refresh menu items. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -445,6 +490,9 @@ export default function SettingsContent() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Category</DialogTitle>
+                <DialogDescription>
+                  Create a new category to organize your menu items.
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
@@ -552,8 +600,18 @@ export default function SettingsContent() {
 
       {/* Menu Items List */}
       <Card className="border-2">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Menu Items</CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleRefreshMenuItems}
+            disabled={isRefreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </CardHeader>
         <CardContent>
           {categories.map((category) => {
@@ -592,28 +650,14 @@ export default function SettingsContent() {
                                               <Pencil className="h-4 w-4 mr-1" />
                                               Edit
                                             </Button>
-                                            <Button
-                                              variant="destructive"
-                                              size="sm"
-                                              onClick={async () => {
-                                                try {
-                                                  await deleteMenuItem(item.id)
-                                                  setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                                                  toast({
-                                                    title: "Success",
-                                                    description: "Item deleted successfully",
-                                                  })
-                                                } catch (error) {
-                                                  toast({
-                                                    title: "Error",
-                                                    description: "Failed to delete item",
-                                                    variant: "destructive",
-                                                  })
-                                                }
-                                              }}
-                                            >
-                                              Delete
-                                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingItemId === item.id}
+                            >
+                              {deletingItemId === item.id ? "Deleting..." : "Delete"}
+                            </Button>
                                           </div>
                                         </TableCell>
                                       </TableRow>
@@ -657,24 +701,11 @@ export default function SettingsContent() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={async () => {
-                                try {
-                                  await deleteMenuItem(item.id)
-                                  setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                                  toast({
-                                    title: "Success",
-                                    description: "Item deleted successfully",
-                                  })
-                                } catch (error) {
-                                  toast({
-                                    title: "Error",
-                                    description: "Failed to delete item",
-                                    variant: "destructive",
-                                  })
-                                }
-                              }}
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingItemId === item.id}
                             >
-                              Delete
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              {deletingItemId === item.id ? "Deleting..." : "Delete"}
                             </Button>
                           </div>
                         </TableCell>
@@ -687,13 +718,16 @@ export default function SettingsContent() {
         </CardContent>
       </Card>
 
-      {/* Edit Menu Item Dialog */}
-      <Dialog open={showEditItemDialog} onOpenChange={setShowEditItemDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Menu Item</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+  {/* Edit Menu Item Dialog */}
+  <Dialog open={showEditItemDialog} onOpenChange={setShowEditItemDialog}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Edit Menu Item</DialogTitle>
+        <DialogDescription>
+          Update the item name and price.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="editItemName">Item Name</Label>
               <Input
