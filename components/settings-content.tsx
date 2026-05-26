@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { auth } from "@/utils/firebase"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -490,6 +490,9 @@ export default function SettingsContent() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Category</DialogTitle>
+                <DialogDescription>
+                  Create a new category to organize your menu items.
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
@@ -715,13 +718,16 @@ export default function SettingsContent() {
         </CardContent>
       </Card>
 
-      {/* Edit Menu Item Dialog */}
-      <Dialog open={showEditItemDialog} onOpenChange={setShowEditItemDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Menu Item</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+  {/* Edit Menu Item Dialog */}
+  <Dialog open={showEditItemDialog} onOpenChange={setShowEditItemDialog}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Edit Menu Item</DialogTitle>
+        <DialogDescription>
+          Update the item name and price.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="editItemName">Item Name</Label>
               <Input
