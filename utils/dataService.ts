@@ -145,8 +145,21 @@ const getMenuItems = async () => {
     
     const uniqueItems = Array.from(uniqueItemsMap.values())
     
+    // Silently deduplicate - duplicates are removed automatically on load
+    
+    // Clean up duplicate documents from database if found
     if (uniqueItems.length !== items.length) {
-      console.warn("[v0] Duplicate items detected and removed:", items.length - uniqueItems.length)
+      const seenIds = new Set<string>()
+      items.forEach((item) => {
+        if (seenIds.has(item.id)) {
+          // This is a duplicate - delete it from the database
+          deleteDoc(doc(db, "menuItems", item.id)).catch((error) => {
+            console.error("Failed to cleanup duplicate:", error)
+          })
+        } else {
+          seenIds.add(item.id)
+        }
+      })
     }
     
     return uniqueItems
