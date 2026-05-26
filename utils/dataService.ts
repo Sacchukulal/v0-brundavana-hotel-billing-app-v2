@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, orderBy, Timestamp, where, doc, deleteDoc, updateDoc } from "firebase/firestore"
 import { db, auth } from "./firebase"
 
 export interface MenuItem {
@@ -97,7 +97,7 @@ const getOrders = async () => {
   }
 }
 
-const saveMenuItem = async (item: Omit<MenuItem, "id" | "userId">) => {
+const saveMenuItem = async (item: MenuItem | Omit<MenuItem, "id" | "userId">) => {
   try {
     const user = auth.currentUser
     if (!user) throw new Error("No authenticated user")
@@ -107,8 +107,15 @@ const saveMenuItem = async (item: Omit<MenuItem, "id" | "userId">) => {
       userId: user.uid,
     }
 
-    const docRef = await addDoc(collection(db, "menuItems"), menuItemData)
-    return docRef.id
+    // If item has an id, update the existing document
+    if ("id" in item && item.id) {
+      await updateDoc(doc(db, "menuItems", item.id), menuItemData)
+      return item.id
+    } else {
+      // Create new document if no id
+      const docRef = await addDoc(collection(db, "menuItems"), menuItemData)
+      return docRef.id
+    }
   } catch (error) {
     console.error("Error saving menu item:", error)
     throw error

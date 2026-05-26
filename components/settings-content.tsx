@@ -324,7 +324,10 @@ export default function SettingsContent() {
   const handleEditItemSubmit = async () => {
     if (!editingItem) return
 
-    if (!editItemForm.name.trim() || !editItemForm.price.trim()) {
+    const trimmedName = editItemForm.name.trim()
+    const trimmedPrice = editItemForm.price.trim()
+
+    if (!trimmedName || !trimmedPrice) {
       toast({
         title: "Error",
         description: "Please fill in all fields.",
@@ -333,11 +336,21 @@ export default function SettingsContent() {
       return
     }
 
+    const priceNum = Number(trimmedPrice)
+    if (isNaN(priceNum) || priceNum < 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid price.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const updatedItem = {
         ...editingItem,
-        name: editItemForm.name,
-        price: Number(editItemForm.price),
+        name: trimmedName,
+        price: priceNum,
       }
 
       await saveMenuItem(updatedItem)
@@ -348,6 +361,7 @@ export default function SettingsContent() {
 
       setShowEditItemDialog(false)
       setEditingItem(null)
+      setEditItemForm({ name: "", price: "" })
 
       toast({
         title: "Success",
@@ -629,22 +643,23 @@ export default function SettingsContent() {
                                             <Button
                                               variant="destructive"
                                               size="sm"
-                                              onClick={async () => {
-                                                try {
-                                                  await deleteMenuItem(item.id)
-                                                  setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                                                  toast({
-                                                    title: "Success",
-                                                    description: "Item deleted successfully",
-                                                  })
-                                                } catch (error) {
-                                                  toast({
-                                                    title: "Error",
-                                                    description: "Failed to delete item",
-                                                    variant: "destructive",
-                                                  })
-                                                }
-                                              }}
+                  onClick={async () => {
+                  try {
+                    await deleteMenuItem(item.id)
+                    setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
+                    toast({
+                      title: "Success",
+                      description: "Item deleted successfully",
+                    })
+                  } catch (error) {
+                    console.error("Error deleting menu item:", error)
+                    toast({
+                      title: "Error",
+                      description: "Failed to delete item. Please try again.",
+                      variant: "destructive",
+                    })
+                  }
+                }}
                                             >
                                               Delete
                                             </Button>
@@ -691,25 +706,27 @@ export default function SettingsContent() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={async () => {
-                                try {
-                                  await deleteMenuItem(item.id)
-                                  setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                                  toast({
-                                    title: "Success",
-                                    description: "Item deleted successfully",
-                                  })
-                                } catch (error) {
-                                  toast({
-                                    title: "Error",
-                                    description: "Failed to delete item",
-                                    variant: "destructive",
-                                  })
-                                }
-                              }}
-                            >
-                              Delete
-                            </Button>
+                  onClick={async () => {
+                  try {
+                    await deleteMenuItem(item.id)
+                    setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
+                    toast({
+                      title: "Success",
+                      description: "Item deleted successfully",
+                    })
+                  } catch (error) {
+                    console.error("Error deleting menu item:", error)
+                    toast({
+                      title: "Error",
+                      description: "Failed to delete item. Please try again.",
+                      variant: "destructive",
+                    })
+                  }
+                }}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
                           </div>
                         </TableCell>
                       </TableRow>
