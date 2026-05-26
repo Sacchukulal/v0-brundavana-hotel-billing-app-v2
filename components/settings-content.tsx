@@ -57,6 +57,7 @@ export default function SettingsContent() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [editItemForm, setEditItemForm] = useState({ name: "", price: "" })
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
   // Fix for items not loading on first visit - use persistent auth state listener
   useEffect(() => {
@@ -259,9 +260,13 @@ export default function SettingsContent() {
   )[0]
 
   const handleDeleteItem = async (id: string) => {
+    // Prevent multiple delete clicks on the same item
+    if (deletingItemId === id) return
+    
+    setDeletingItemId(id)
     try {
       await deleteMenuItem(id)
-      setMenuItems(menuItems.filter((item) => item.id !== id))
+      setMenuItems((prev) => prev.filter((item) => item.id !== id))
       toast({
         title: "Success",
         description: "Menu item deleted successfully.",
@@ -273,6 +278,8 @@ export default function SettingsContent() {
         description: "Failed to delete menu item. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setDeletingItemId(null)
     }
   }
 
@@ -640,29 +647,14 @@ export default function SettingsContent() {
                                               <Pencil className="h-4 w-4 mr-1" />
                                               Edit
                                             </Button>
-                                            <Button
-                                              variant="destructive"
-                                              size="sm"
-                  onClick={async () => {
-                  try {
-                    await deleteMenuItem(item.id)
-                    setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                    toast({
-                      title: "Success",
-                      description: "Item deleted successfully",
-                    })
-                  } catch (error) {
-                    console.error("Error deleting menu item:", error)
-                    toast({
-                      title: "Error",
-                      description: "Failed to delete item. Please try again.",
-                      variant: "destructive",
-                    })
-                  }
-                }}
-                                            >
-                                              Delete
-                                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingItemId === item.id}
+                            >
+                              {deletingItemId === item.id ? "Deleting..." : "Delete"}
+                            </Button>
                                           </div>
                                         </TableCell>
                                       </TableRow>
@@ -706,27 +698,12 @@ export default function SettingsContent() {
                             <Button
                               variant="destructive"
                               size="sm"
-                  onClick={async () => {
-                  try {
-                    await deleteMenuItem(item.id)
-                    setMenuItems((prev) => prev.filter((i) => i.id !== item.id))
-                    toast({
-                      title: "Success",
-                      description: "Item deleted successfully",
-                    })
-                  } catch (error) {
-                    console.error("Error deleting menu item:", error)
-                    toast({
-                      title: "Error",
-                      description: "Failed to delete item. Please try again.",
-                      variant: "destructive",
-                    })
-                  }
-                }}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingItemId === item.id}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              {deletingItemId === item.id ? "Deleting..." : "Delete"}
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
