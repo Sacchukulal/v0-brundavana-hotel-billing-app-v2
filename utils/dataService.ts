@@ -135,8 +135,21 @@ const getMenuItems = async () => {
       ...doc.data(),
     })) as MenuItem[]
     
-    console.log("[v0] Loaded menu items:", items.map(item => ({ id: item.id, name: item.name })))
-    return items
+    // Deduplicate items by ID, keeping the first occurrence
+    const uniqueItemsMap = new Map<string, MenuItem>()
+    items.forEach((item) => {
+      if (!uniqueItemsMap.has(item.id)) {
+        uniqueItemsMap.set(item.id, item)
+      }
+    })
+    
+    const uniqueItems = Array.from(uniqueItemsMap.values())
+    
+    if (uniqueItems.length !== items.length) {
+      console.warn("[v0] Duplicate items detected and removed:", items.length - uniqueItems.length)
+    }
+    
+    return uniqueItems
   } catch (error) {
     console.error("[v0] Error getting menu items:", error)
     throw new Error("Failed to load menu items. Please ensure you are logged in.")
@@ -352,16 +365,13 @@ const getMonthlyBillItemsWithoutIndex = async (customerId: string, startDate: Da
 
 const deleteMenuItem = async (itemId: string) => {
   try {
-    console.log("[v0] deleteMenuItem called with ID:", itemId)
     const user = auth.currentUser
     if (!user) throw new Error("No authenticated user")
 
-    console.log("[v0] Attempting to delete from Firestore:", itemId)
     const docRef = doc(db, "menuItems", itemId)
     await deleteDoc(docRef)
-    console.log("[v0] Successfully deleted from Firestore:", itemId)
   } catch (error) {
-    console.error("[v0] Error deleting menu item:", error)
+    console.error("Error deleting menu item:", error)
     throw error
   }
 }
